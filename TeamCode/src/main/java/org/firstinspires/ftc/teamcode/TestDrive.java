@@ -7,12 +7,12 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 /**
  *  A basic driving op-mode for testing the chassis.
+ *
+ *  Uses linear algebra to calculate voltage multipliers for mecanums.
  */
 
 @TeleOp(name="TeleOp")
 public class TestDrive extends LinearOpMode {
-    private double powerLF, powerRF, powerLR, powerRR;
-
     @Override
     public void runOpMode() {
         // Send status
@@ -30,7 +30,6 @@ public class TestDrive extends LinearOpMode {
         rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
         rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        // Motor-specific config
         // Resist external force to motor
         leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -40,23 +39,26 @@ public class TestDrive extends LinearOpMode {
         // Wait for driver to press play
         waitForStart();
 
-        // Set power to motors based on left and right stick
         while (opModeIsActive()) {
-            // Calculations (mecanum)
-            double r = Math.hypot(gamepad1.left_stick_x, gamepad1.left_stick_y);
-            double rightX = gamepad1.right_stick_x;
-            double robotAngle = Math.atan2(gamepad1.left_stick_y,
-                                           gamepad1.left_stick_x) - Math.PI / 4;
+            // Calculate voltage multipliers
+            // Based on Taheri, Qiao, & Ghaeminezhad (2015) in the IJCA
+            //          "Kinematic Model of a Four Mecanum Wheeled Mobile Robot"
+            double voltLF = gamepad1.left_stick_y - gamepad1.left_stick_x - gamepad1.right_stick_x;
+            double voltRF = gamepad1.left_stick_y + gamepad1.left_stick_x + gamepad1.right_stick_x;
+            double voltLR = gamepad1.left_stick_y + gamepad1.left_stick_x - gamepad1.right_stick_x;
+            double voltRR = gamepad1.left_stick_y - gamepad1.left_stick_x + gamepad1.right_stick_x;
 
-            powerLF = r * Math.sin(robotAngle) - rightX;
-            powerRF = r * Math.cos(robotAngle) + rightX;
-            powerLR = r * Math.cos(robotAngle) - rightX;
-            powerRR = r * Math.sin(robotAngle) + rightX;
+            // Adjust calculations for values greater than the maximum (1.0)
+            double largest = 1.0;
+            largest = Math.max(largest, Math.abs(voltLF));
+            largest = Math.max(largest, Math.abs(voltRF));
+            largest = Math.max(largest, Math.abs(voltLR));
+            largest = Math.max(largest, Math.abs(voltRR));
 
-            leftFront.setPower(powerLF);
-            rightFront.setPower(powerRF);
-            leftRear.setPower(powerLR);
-            rightRear.setPower(powerRR);
+            leftFront.setPower(voltLF / largest);
+            rightFront.setPower(voltRF / largest);
+            leftRear.setPower(voltLR / largest);
+            rightRear.setPower(voltRR / largest);
         }
     }
 }
