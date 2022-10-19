@@ -12,9 +12,11 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
  */
 
 @TeleOp(name="TeleOp")
-public class TestDrive extends LinearOpMode {
+public class TestDrive extends LinearOpMode
+{
     @Override
-    public void runOpMode() {
+    public void runOpMode()
+    {
         // Send status
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -39,7 +41,8 @@ public class TestDrive extends LinearOpMode {
         // Wait for driver to press play
         waitForStart();
 
-        while (opModeIsActive()) {
+        while (opModeIsActive())
+        {
             // Calculate voltage multipliers
             // Based on Taheri, Qiao, & Ghaeminezhad (2015) in the IJCA
             //          "Kinematic Model of a Four Mecanum Wheeled Mobile Robot"
