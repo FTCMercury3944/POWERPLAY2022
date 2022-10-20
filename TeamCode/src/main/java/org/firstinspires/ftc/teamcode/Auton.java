@@ -2,11 +2,20 @@ package org.firstinspires.ftc.teamcode;
 
 import android.graphics.Bitmap;
 
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.openftc.apriltag.AprilTagDetection;
+import org.openftc.easyopencv.OpenCvCamera;
+import org.openftc.easyopencv.OpenCvCameraFactory;
+import org.openftc.easyopencv.OpenCvCameraRotation;
+
+import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -34,62 +43,114 @@ import java.util.concurrent.CompletableFuture;
 @Autonomous
 public class Auton extends LinearOpMode
 {
-    private int parkingZone;
+    private AprilTagDetection tagOfInterest;
+    private OpenCvCamera camera;
+
+    static final double FEET_PER_METER = 3.28084;
+
+    // Width/height (w = h) of tag in meters
+    private static final double TAG_SIZE = 0.166;
+
+    // Lens intrinsics for Logitech C920 webcam
+    // (fx, fy) is focal length in pixels
+    // (cx, cy) is principal point in pixels
+    private final double FX = 1428.470;
+    private final double FY = 1428.470;
+    private final double CX = 630.909;
+    private final double CY = 358.721;
+
+    // Tag IDs 1, 2, and 3 from the 36H11 family
+    int LEFT = 1;
+    int MIDDLE = 2;
+    int RIGHT = 3;
 
     @Override
-    public void runOpMode()
-    {
-        // Send status
-        telemetry.addData("Status", "Initialized");
-        telemetry.update();
+    public void runOpMode() {
+        telemetry.setMsTransmissionInterval(50);
 
-        // Initialize the DC motors for each wheel
-        // Declare op-mode members
-        DcMotor leftFront = hardwareMap.get(DcMotor.class, "leftFront");
-        DcMotor rightFront = hardwareMap.get(DcMotor.class, "rightFront");
-        DcMotor leftRear = hardwareMap.get(DcMotor.class, "leftRear");
-        DcMotor rightRear = hardwareMap.get(DcMotor.class, "rightRear");
+        // Setup webcam
+        int cameraID = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        camera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "Webcam 1"), cameraID);
 
-        // Reverse right side
-        rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
-        rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
+        // Start pipeline
+        DetectionPipeline pipeline = new DetectionPipeline(TAG_SIZE, FX, FY, CX, CY);
+        camera.setPipeline(pipeline);
 
-        // Resist external force to motor
-        leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        leftRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        camera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+            @Override
+            public void onOpened() {
+                camera.startStreaming(800, 448, OpenCvCameraRotation.UPRIGHT);
+            }
 
-        // Wait for team to press play
-        waitForStart();
-
-        // Take starting photo, generally used for detection
-        // TODO: Hookup camera
-        Bitmap startFrame = null;
-
-        // Asynchronously detect parking zone
-        CompletableFuture.runAsync(() -> {
-            detectParkingZone(startFrame);
+            @Override
+            public void onError(int errorCode) {
+                // Nonexistent error handling, required for async
+                // TODO Perhaps?
+            }
         });
 
+        // Init loop, replacing waitForStart()
+        while (!isStarted() && !isStopRequested())
+        {
+            ArrayList<AprilTagDetection> currentDetections = pipeline.getLatestDetections();
+
+            if(currentDetections.size() != 0)
+            {
+                boolean tagFound = false;
+
+                for (AprilTagDetection tag : currentDetections)
+                {
+                    if (tag.id == LEFT || tag.id == MIDDLE || tag.id == RIGHT)
+                    {
+                        tagOfInterest = tag;
+                        tagFound = true;
+                        break;
+                    }
+                }
+
+                if (tagFound)
+                {
+                    telemetry.addLine("Tag is in sight!\n\n");
+                }
+            }
+
+            tagToTelemetry(tagOfInterest);
+            telemetry.update();
+
+            sleep(20);
+        }
+
+        // Send parking zone to telemetry
+        if (tagOfInterest == null)
+        {
+            telemetry.addLine("No tag snapshot available.");
+        }
+        else
+        {
+            telemetry.addLine(String.format(Locale.ENGLISH, "Parking zone %d!", tagOfInterest.id));
+            telemetry.update();
+        }
+
+        // TODO: Remove (debug)
         while (opModeIsActive())
         {
-
+            sleep(20);
         }
     }
 
     /**
-     * Takes a photo and detects the parking zone on a signal sleeve.
-     * The number of the parking zone is put into the global variable.
+     *  Print out detected tag, translation, and rotation information
+     *
+     *  @param detection Detected tag
      */
-    public void detectParkingZone(Bitmap frame)
+    void tagToTelemetry(AprilTagDetection detection)
     {
-        // Take 2 more frames, to be safe
-        Bitmap safetyFrameOne = null;
-        Bitmap safetyFrameTwo = null;
-
-        // Determine image from signal sleeve
-
-        parkingZone = 0;
+        telemetry.addLine(String.format(Locale.ENGLISH, "Detected tag ID: %d", detection.id));
+        telemetry.addLine(String.format(Locale.ENGLISH, "Translation X: %.2f feet", detection.pose.x*FEET_PER_METER));
+        telemetry.addLine(String.format(Locale.ENGLISH, "Translation Y: %.2f feet", detection.pose.y*FEET_PER_METER));
+        telemetry.addLine(String.format(Locale.ENGLISH, "Translation Z: %.2f feet", detection.pose.z*FEET_PER_METER));
+        telemetry.addLine(String.format(Locale.ENGLISH, "Rotation Yaw: %.2f degrees", Math.toDegrees(detection.pose.yaw)));
+        telemetry.addLine(String.format(Locale.ENGLISH, "Rotation Pitch: %.2f degrees", Math.toDegrees(detection.pose.pitch)));
+        telemetry.addLine(String.format(Locale.ENGLISH, "Rotation Roll: %.2f degrees", Math.toDegrees(detection.pose.roll)));
     }
 }
