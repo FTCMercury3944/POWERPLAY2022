@@ -17,6 +17,7 @@ import org.openftc.easyopencv.OpenCvPipeline;
 import java.util.ArrayList;
 
 // TODO: Cleanup from last year
+// WARNING: Perhaps broken?
 class DetectionPipeline extends OpenCvPipeline
 {
     private long nativeAprilTagPtr;
