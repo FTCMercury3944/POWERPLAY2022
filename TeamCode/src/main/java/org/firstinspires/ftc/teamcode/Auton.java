@@ -1,12 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
-import android.graphics.Bitmap;
-
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.openftc.apriltag.AprilTagDetection;
@@ -16,7 +11,6 @@ import org.openftc.easyopencv.OpenCvCameraRotation;
 
 import java.util.ArrayList;
 import java.util.Locale;
-import java.util.concurrent.CompletableFuture;
 
 /**
  *  Autonomous mode system:
@@ -94,7 +88,7 @@ public class Auton extends LinearOpMode
         {
             ArrayList<AprilTagDetection> currentDetections = pipeline.getLatestDetections();
 
-            if(currentDetections.size() != 0)
+            if (currentDetections.size() != 0)
             {
                 boolean tagFound = false;
 
@@ -110,26 +104,34 @@ public class Auton extends LinearOpMode
 
                 if (tagFound)
                 {
-                    telemetry.addLine("Tag is in sight!\n\n");
+                    tagToTelemetry(tagOfInterest);
                 }
+                else if (tagOfInterest != null)
+                {
+                    tagToTelemetry(tagOfInterest);
+                }
+
+            }
+            else if (tagOfInterest != null)
+            {
+                tagToTelemetry(tagOfInterest);
             }
 
-            tagToTelemetry(tagOfInterest);
             telemetry.update();
-
             sleep(20);
         }
 
-        // Send parking zone to telemetry
-        if (tagOfInterest == null)
+        // Show end point
+        if(tagOfInterest != null)
         {
-            telemetry.addLine("No tag snapshot available.");
+            telemetry.addLine(String.format(Locale.ENGLISH, "Parking zone %s!", numToZone(tagOfInterest.id)));
         }
         else
         {
-            telemetry.addLine(String.format(Locale.ENGLISH, "Parking zone %d!", tagOfInterest.id));
-            telemetry.update();
+            telemetry.addLine("No tag found.");
         }
+
+        telemetry.update();
 
         // TODO: Remove (debug)
         while (opModeIsActive())
@@ -139,11 +141,22 @@ public class Auton extends LinearOpMode
     }
 
     /**
+     *  Converts a number from 1 through 3 to the parking zone name
+     *
+     *  @param parkingZoneId 1, 2, or 3 - number representing parking zone
+     *  @return Parking zone name (left, middle, or right)
+     */
+    private String numToZone(int parkingZoneId)
+    {
+        return new String[]{"left", "middle", "right"}[parkingZoneId - 1];
+    }
+
+    /**
      *  Print out detected tag, translation, and rotation information
      *
      *  @param detection Detected tag
      */
-    void tagToTelemetry(AprilTagDetection detection)
+    private void tagToTelemetry(AprilTagDetection detection)
     {
         telemetry.addLine(String.format(Locale.ENGLISH, "Detected tag ID: %d", detection.id));
         telemetry.addLine(String.format(Locale.ENGLISH, "Translation X: %.2f feet", detection.pose.x*FEET_PER_METER));
