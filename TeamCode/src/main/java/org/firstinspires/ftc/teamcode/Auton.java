@@ -40,23 +40,23 @@ public class Auton extends LinearOpMode
     private AprilTagDetection tagOfInterest;
     private OpenCvCamera camera;
 
-    static final double FEET_PER_METER = 3.28084;
+    private static final double FEET_PER_METER = 3.28084;
 
-    // Width/height (w = h) of tag in meters
+    // Side length of square tag in meters
     private static final double TAG_SIZE = 0.166;
 
     // Lens intrinsics for Logitech C920 webcam
-    // (fx, fy) is focal length in pixels
-    // (cx, cy) is principal point in pixels
-    private final double FX = 1428.470;
-    private final double FY = 1428.470;
-    private final double CX = 630.909;
-    private final double CY = 358.721;
+    // (FX, FY) is focal length in pixels
+    // (CX, CY) is principal point in pixels
+    private static final double FX = 1428.470;
+    private static final double FY = 1428.470;
+    private static final double CX = 630.909;
+    private static final double CY = 358.721;
 
     // Tag IDs 1, 2, and 3 from the 36H11 family
-    int LEFT = 1;
-    int MIDDLE = 2;
-    int RIGHT = 3;
+    private static final int LEFT = 1;
+    private static final int MIDDLE = 2;
+    private static final int RIGHT = 3;
 
     @Override
     public void runOpMode() {
@@ -66,7 +66,7 @@ public class Auton extends LinearOpMode
         int cameraID = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
         camera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "Webcam 1"), cameraID);
 
-        // Start pipeline
+        // Begin detection pipeline
         DetectionPipeline pipeline = new DetectionPipeline(TAG_SIZE, FX, FY, CX, CY);
         camera.setPipeline(pipeline);
 
