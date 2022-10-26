@@ -10,6 +10,7 @@ import org.opencv.core.Point;
 import org.opencv.core.Point3;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
+
 import org.openftc.apriltag.AprilTagDetection;
 import org.openftc.apriltag.AprilTagDetectorJNI;
 import org.openftc.easyopencv.OpenCvPipeline;
@@ -17,31 +18,31 @@ import org.openftc.easyopencv.OpenCvPipeline;
 import java.util.ArrayList;
 
 /**
- *  AprilTag detection pipeline, for use in Autonomous
+ *  AprilTag detection pipeline, for use in Autonomous mode
  */
 
 class DetectionPipeline extends OpenCvPipeline
 {
     private long nativeAprilTagPtr;
-    private final Mat gray = new Mat();
+    private final Mat GRAY = new Mat();
     private ArrayList<AprilTagDetection> detections = new ArrayList<>();
 
     private Mat cameraMatrix;
 
-    private final Scalar blue = new Scalar(7, 197, 235, 255);
-    private final Scalar red = new Scalar(255, 0, 0, 255);
-    private final Scalar green = new Scalar(0, 255, 0, 255);
-    private final Scalar white = new Scalar(255, 255, 255, 255);
+    private final Scalar BLUE = new Scalar(7, 197, 235, 255);
+    private final Scalar RED = new Scalar(255, 0, 0, 255);
+    private final Scalar GREEN = new Scalar(0, 255, 0, 255);
+    private final Scalar WHITE = new Scalar(255, 255, 255, 255);
 
-    // (fx, fy) is focal length in pixels
-    // (cx, cy) is principal point in pixels
-    private final double fx;
-    private final double fy;
-    private final double cx;
-    private final double cy;
+    // (FX, FY) is focal length in pixels
+    // (CX, CY) is principal point in pixels
+    private final double FX;
+    private final double FY;
+    private final double CX;
+    private final double CY;
 
     // Side length of square tag in meters
-    private final double tagSize;
+    private final double TAG_SIZE;
 
     private float decimation;
     private boolean needToSetDecimation;
@@ -49,11 +50,11 @@ class DetectionPipeline extends OpenCvPipeline
 
     public DetectionPipeline(double tagSize, double fx, double fy, double cx, double cy)
     {
-        this.tagSize = tagSize;
-        this.fx = fx;
-        this.fy = fy;
-        this.cx = cx;
-        this.cy = cy;
+        this.TAG_SIZE = tagSize;
+        this.FX = fx;
+        this.FY = fy;
+        this.CX = cx;
+        this.CY = cy;
 
         // Construct camera matrix
         constructMatrix();
@@ -77,7 +78,7 @@ class DetectionPipeline extends OpenCvPipeline
     public Mat processFrame(Mat input)
     {
         // Convert to grayscale
-        Imgproc.cvtColor(input, gray, Imgproc.COLOR_RGBA2GRAY);
+        Imgproc.cvtColor(input, GRAY, Imgproc.COLOR_RGBA2GRAY);
 
         // Set decimation parameter
         synchronized (decimationSync)
@@ -90,14 +91,14 @@ class DetectionPipeline extends OpenCvPipeline
         }
 
         // Run AprilTag
-        detections = AprilTagDetectorJNI.runAprilTagDetectorSimple(nativeAprilTagPtr, gray, tagSize, fx, fy, cx, cy);
+        detections = AprilTagDetectorJNI.runAprilTagDetectorSimple(nativeAprilTagPtr, GRAY, TAG_SIZE, FX, FY, CX, CY);
 
         // Draw 6DOF markers on the image with OpenCV
         for (AprilTagDetection detection : detections)
         {
-            Pose pose = poseFromTrapezoid(detection.corners, cameraMatrix, tagSize);
-            drawAxisMarker(input, tagSize/2.0, 6, pose.rvec, pose.tvec, cameraMatrix);
-            draw3dCubeMarker(input, tagSize, tagSize, tagSize, 5, pose.rvec, pose.tvec, cameraMatrix);
+            Pose pose = poseFromTrapezoid(detection.corners, cameraMatrix);
+            drawAxisMarker(input, TAG_SIZE/2.0, 6, pose.rvec, pose.tvec, cameraMatrix);
+            draw3dCubeMarker(input, TAG_SIZE, TAG_SIZE, TAG_SIZE, 5, pose.rvec, pose.tvec, cameraMatrix);
         }
 
         return input;
@@ -120,14 +121,14 @@ class DetectionPipeline extends OpenCvPipeline
         cameraMatrix = new Mat(3, 3, CvType.CV_32FC1);
 
         // Top
-        cameraMatrix.put(0, 0, fx);
+        cameraMatrix.put(0, 0, FX);
         cameraMatrix.put(0, 1, 0);
-        cameraMatrix.put(0, 2, cx);
+        cameraMatrix.put(0, 2, CX);
 
         // Middle
         cameraMatrix.put(1, 0, 0);
-        cameraMatrix.put(1, 1, fy);
-        cameraMatrix.put(1, 2, cy);
+        cameraMatrix.put(1, 1, FY);
+        cameraMatrix.put(1, 2, CY);
 
         // Bottom
         cameraMatrix.put(2, 0, 0);
@@ -161,11 +162,11 @@ class DetectionPipeline extends OpenCvPipeline
         Point[] projectedPoints = matProjectedPoints.toArray();
 
         // Draw marker
-        Imgproc.line(buf, projectedPoints[0], projectedPoints[1], red, thickness);
-        Imgproc.line(buf, projectedPoints[0], projectedPoints[2], green, thickness);
-        Imgproc.line(buf, projectedPoints[0], projectedPoints[3], blue, thickness);
+        Imgproc.line(buf, projectedPoints[0], projectedPoints[1], RED, thickness);
+        Imgproc.line(buf, projectedPoints[0], projectedPoints[2], GREEN, thickness);
+        Imgproc.line(buf, projectedPoints[0], projectedPoints[3], BLUE, thickness);
 
-        Imgproc.circle(buf, projectedPoints[0], thickness, white, -1);
+        Imgproc.circle(buf, projectedPoints[0], thickness, WHITE, -1);
     }
 
     void draw3dCubeMarker(Mat buf, double length, double tagWidth, double tagHeight, int thickness, Mat rvec, Mat tvec, Mat cameraMatrix)
@@ -190,14 +191,14 @@ class DetectionPipeline extends OpenCvPipeline
         // Draw pillars
         for (int i = 0; i < 4; i++)
         {
-            Imgproc.line(buf, projectedPoints[i], projectedPoints[i+4], blue, thickness);
+            Imgproc.line(buf, projectedPoints[i], projectedPoints[i+4], BLUE, thickness);
         }
 
         // Draw top lines
-        Imgproc.line(buf, projectedPoints[4], projectedPoints[5], green, thickness);
-        Imgproc.line(buf, projectedPoints[5], projectedPoints[6], green, thickness);
-        Imgproc.line(buf, projectedPoints[6], projectedPoints[7], green, thickness);
-        Imgproc.line(buf, projectedPoints[4], projectedPoints[7], green, thickness);
+        Imgproc.line(buf, projectedPoints[4], projectedPoints[5], GREEN, thickness);
+        Imgproc.line(buf, projectedPoints[5], projectedPoints[6], GREEN, thickness);
+        Imgproc.line(buf, projectedPoints[6], projectedPoints[7], GREEN, thickness);
+        Imgproc.line(buf, projectedPoints[4], projectedPoints[7], GREEN, thickness);
     }
 
     /**
@@ -205,20 +206,19 @@ class DetectionPipeline extends OpenCvPipeline
      *
      *  @param points The points which form the trapezoid
      *  @param cameraMatrix The camera intrinsics matrix
-     *  @param tagSize The original side length of the tag
      *  @return The 6DOF pose of the camera relative to the tag
      */
-    private Pose poseFromTrapezoid(Point[] points, Mat cameraMatrix, double tagSize)
+    private Pose poseFromTrapezoid(Point[] points, Mat cameraMatrix)
     {
         // The actual 2d points of the tag detected in the image
         MatOfPoint2f points2d = new MatOfPoint2f(points);
 
         // The 3d points of the tag in an "ideal projection"
         Point3[] arrayPoints3d = new Point3[4];
-        arrayPoints3d[0] = new Point3(-tagSize/2, tagSize/2, 0);
-        arrayPoints3d[1] = new Point3(tagSize/2, tagSize/2, 0);
-        arrayPoints3d[2] = new Point3(tagSize/2, -tagSize/2, 0);
-        arrayPoints3d[3] = new Point3(-tagSize/2, -tagSize/2, 0);
+        arrayPoints3d[0] = new Point3(-TAG_SIZE/2, TAG_SIZE/2, 0);
+        arrayPoints3d[1] = new Point3(TAG_SIZE/2, TAG_SIZE/2, 0);
+        arrayPoints3d[2] = new Point3(TAG_SIZE/2, -TAG_SIZE/2, 0);
+        arrayPoints3d[3] = new Point3(-TAG_SIZE/2, -TAG_SIZE/2, 0);
         MatOfPoint3f points3d = new MatOfPoint3f(arrayPoints3d);
 
         // Solve for pose
@@ -229,9 +229,9 @@ class DetectionPipeline extends OpenCvPipeline
     }
 
     /**
-     *  A simple container to hold both rotation and translation vectors, which together form a 6DOF pose.
+     *  A simple container to hold both rotation and translation vectors, which together form a 6DOF pose
      */
-    private class Pose
+    private static class Pose
     {
         public final Mat rvec;
         public final Mat tvec;

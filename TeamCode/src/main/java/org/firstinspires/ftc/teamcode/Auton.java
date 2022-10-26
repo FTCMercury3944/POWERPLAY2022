@@ -43,6 +43,7 @@ public class Auton extends LinearOpMode
     private static final double FEET_PER_METER = 3.28084;
 
     // Side length of square tag in meters
+    // TODO: Calibrate
     private static final double TAG_SIZE = 0.166;
 
     // Lens intrinsics for Logitech C920 webcam
@@ -79,7 +80,6 @@ public class Auton extends LinearOpMode
             @Override
             public void onError(int errorCode) {
                 // Nonexistent error handling, required for async
-                // TODO Perhaps?
             }
         });
 
@@ -90,29 +90,17 @@ public class Auton extends LinearOpMode
 
             if (currentDetections.size() != 0)
             {
-                boolean tagFound = false;
-
                 for (AprilTagDetection tag : currentDetections)
                 {
                     if (tag.id == LEFT || tag.id == MIDDLE || tag.id == RIGHT)
                     {
                         tagOfInterest = tag;
-                        tagFound = true;
                         break;
                     }
                 }
-
-                if (tagFound)
-                {
-                    tagToTelemetry(tagOfInterest);
-                }
-                else if (tagOfInterest != null)
-                {
-                    tagToTelemetry(tagOfInterest);
-                }
-
             }
-            else if (tagOfInterest != null)
+
+            if (tagOfInterest != null)
             {
                 tagToTelemetry(tagOfInterest);
             }
@@ -143,7 +131,7 @@ public class Auton extends LinearOpMode
     /**
      *  Converts a number from 1 through 3 to the parking zone name
      *
-     *  @param parkingZoneId 1, 2, or 3 - number representing parking zone
+     *  @param parkingZoneId Number representing parking zone (1, 2, or 3)
      *  @return Parking zone name (left, middle, or right)
      */
     private String numToZone(int parkingZoneId)
