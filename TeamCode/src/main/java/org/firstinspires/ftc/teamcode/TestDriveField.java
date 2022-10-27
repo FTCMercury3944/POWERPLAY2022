@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.bosch.BNO055IMU;
+
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -7,13 +9,13 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 /**
  *  A basic driving op-mode for testing the chassis.
- *  Robot-oriented.
+ *  Field-oriented.
  *
  *  Uses linear algebra to calculate voltage multipliers for mecanums.
  */
 
-@TeleOp(name="TeleOp")
-public class TestDrive extends LinearOpMode
+@TeleOp(name="TeleOpField")
+public class TestDriveField extends LinearOpMode
 {
     @Override
     public void runOpMode()
@@ -39,6 +41,12 @@ public class TestDrive extends LinearOpMode
         leftRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        // Retrieve inertial measurement unit
+        BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
+        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+        parameters.angleUnit = BNO055IMU.AngleUnit.RADIANS;
+        imu.initialize(parameters);
+
         // Wait for driver to press play
         waitForStart();
 
@@ -49,17 +57,13 @@ public class TestDrive extends LinearOpMode
 
         while (opModeIsActive())
         {
-            double x = gamepad1.left_stick_x;
-            double y = gamepad1.left_stick_y;
-            double rx = gamepad1.right_stick_x;
-
             // Calculate voltage multipliers
             // Based on Taheri, Qiao, & Ghaeminezhad (2015) in the IJCA
             //          "Kinematic Model of a Four Mecanum Wheeled Mobile Robot"
-            double voltLF = y - x - rx;
-            double voltRF = y + x + rx;
-            double voltLR = y + x - rx;
-            double voltRR = y - x + rx;
+            double voltLF = gamepad1.left_stick_y - gamepad1.left_stick_x - gamepad1.right_stick_x;
+            double voltRF = gamepad1.left_stick_y + gamepad1.left_stick_x + gamepad1.right_stick_x;
+            double voltLR = gamepad1.left_stick_y + gamepad1.left_stick_x - gamepad1.right_stick_x;
+            double voltRR = gamepad1.left_stick_y - gamepad1.left_stick_x + gamepad1.right_stick_x;
 
             // Adjust calculations for values greater than the maximum (1.0)
             double largest = 1.0;
