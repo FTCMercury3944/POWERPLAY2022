@@ -83,8 +83,12 @@ public class Auton extends LinearOpMode
             }
         });
 
-        // Init loop, replacing waitForStart()
-        while (!isStarted() && !isStopRequested())
+        // Wait for game to begin
+        waitForStart();
+
+        // Detect AprilTag
+        boolean tagFound = false;
+        while (isStarted() && !tagFound && !isStopRequested())
         {
             ArrayList<AprilTagDetection> currentDetections = pipeline.getLatestDetections();
 
@@ -95,17 +99,12 @@ public class Auton extends LinearOpMode
                     if (tag.id == LEFT || tag.id == MIDDLE || tag.id == RIGHT)
                     {
                         tagOfInterest = tag;
+                        tagFound = true;
                         break;
                     }
                 }
             }
 
-            if (tagOfInterest != null)
-            {
-                tagToTelemetry(tagOfInterest);
-            }
-
-            telemetry.update();
             sleep(20);
         }
 
@@ -137,21 +136,5 @@ public class Auton extends LinearOpMode
     private String numToZone(int parkingZoneId)
     {
         return new String[]{"left", "middle", "right"}[parkingZoneId - 1];
-    }
-
-    /**
-     *  Print out detected tag, translation, and rotation information
-     *
-     *  @param detection Detected tag
-     */
-    private void tagToTelemetry(AprilTagDetection detection)
-    {
-        telemetry.addLine(String.format(Locale.ENGLISH, "Detected tag ID: %d", detection.id));
-        telemetry.addLine(String.format(Locale.ENGLISH, "Translation X: %.2f feet", detection.pose.x*FEET_PER_METER));
-        telemetry.addLine(String.format(Locale.ENGLISH, "Translation Y: %.2f feet", detection.pose.y*FEET_PER_METER));
-        telemetry.addLine(String.format(Locale.ENGLISH, "Translation Z: %.2f feet", detection.pose.z*FEET_PER_METER));
-        telemetry.addLine(String.format(Locale.ENGLISH, "Rotation Yaw: %.2f degrees", Math.toDegrees(detection.pose.yaw)));
-        telemetry.addLine(String.format(Locale.ENGLISH, "Rotation Pitch: %.2f degrees", Math.toDegrees(detection.pose.pitch)));
-        telemetry.addLine(String.format(Locale.ENGLISH, "Rotation Roll: %.2f degrees", Math.toDegrees(detection.pose.roll)));
     }
 }
