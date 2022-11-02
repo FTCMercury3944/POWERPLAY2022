@@ -40,8 +40,6 @@ public class Auton extends LinearOpMode
     private AprilTagDetection tagOfInterest;
     private OpenCvCamera camera;
 
-    private static final double FEET_PER_METER = 3.28084;
-
     // Side length of square tag in meters
     // TODO: Calibrate
     private static final double TAG_SIZE = 0.166;
