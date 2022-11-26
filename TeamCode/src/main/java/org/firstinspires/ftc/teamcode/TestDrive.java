@@ -28,6 +28,8 @@ public class TestDrive extends LinearOpMode
         DcMotor rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         DcMotor leftRear = hardwareMap.get(DcMotor.class, "leftRear");
         DcMotor rightRear = hardwareMap.get(DcMotor.class, "rightRear");
+        DcMotor armMotor = hardwareMap.get(DcMotor.class, "armMotor");
+        // TODO: clawServo
 
         // Reverse right side
         rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -38,6 +40,7 @@ public class TestDrive extends LinearOpMode
         rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         leftRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        armMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // Wait for driver to press play
         waitForStart();
@@ -52,6 +55,8 @@ public class TestDrive extends LinearOpMode
             double x = gamepad1.left_stick_x;
             double y = gamepad1.left_stick_y;
             double rx = gamepad1.right_stick_x;
+            boolean upButton = gamepad1.dpad_up;
+            boolean downButton = gamepad1.dpad_down;
 
             // Calculate voltage multipliers
             // Based on Taheri, Qiao, & Ghaeminezhad (2015) in the IJCA
@@ -68,6 +73,21 @@ public class TestDrive extends LinearOpMode
             largest = Math.max(largest, Math.abs(voltLR));
             largest = Math.max(largest, Math.abs(voltRR));
 
+            // Move arm up when X button is pressed
+            if (upButton)
+            {
+                armMotor.setPower(1.0);
+            }
+            else if (downButton)
+            {
+                armMotor.setPower(-1.0);
+            }
+            else
+            {
+                armMotor.setPower(0.1);
+            }
+
+            // Move wheels
             leftFront.setPower(voltLF / largest);
             rightFront.setPower(voltRF / largest);
             leftRear.setPower(voltLR / largest);

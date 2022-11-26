@@ -568,7 +568,6 @@ public class Auton extends LinearOpMode
     @Override
     public void runOpMode()
     {
-        /*
         // Setup webcam
         int cameraID = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
         camera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "Webcam 1"), cameraID);
@@ -591,7 +590,6 @@ public class Auton extends LinearOpMode
                 // Nonexistent error handling, required for async
             }
         });
-         */
 
         // Set up DC motors
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
@@ -613,7 +611,6 @@ public class Auton extends LinearOpMode
         waitForStart();
 
         // Detect AprilTag
-        /*
         boolean tagFound = false;
         while (isStarted() && !tagFound && !isStopRequested())
         {
@@ -646,13 +643,14 @@ public class Auton extends LinearOpMode
         }
 
         telemetry.update();
-         */
 
+        /*
         for (int i = 0; i < 5; i++)
         {
             moveDistance(48.0, 5.0);
             moveDistance(-48.0, 5.0);
         }
+         */
     }
 
     /**
