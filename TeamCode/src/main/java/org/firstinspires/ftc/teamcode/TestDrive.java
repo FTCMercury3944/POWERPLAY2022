@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
@@ -28,8 +29,8 @@ public class TestDrive extends LinearOpMode
         DcMotor rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         DcMotor leftRear = hardwareMap.get(DcMotor.class, "leftRear");
         DcMotor rightRear = hardwareMap.get(DcMotor.class, "rightRear");
-        DcMotor armMotor = hardwareMap.get(DcMotor.class, "armMotor");
-        // TODO: clawServo
+        DcMotor armMotor = hardwareMap.get(DcMotor.class, "lift");
+        CRServo clawServo = hardwareMap.get(CRServo.class, "claw");
 
         // Reverse right side
         rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -55,10 +56,12 @@ public class TestDrive extends LinearOpMode
             double x = gamepad1.left_stick_x;
             double y = gamepad1.left_stick_y;
             double rx = gamepad1.right_stick_x;
-            boolean upButton = gamepad1.dpad_up;
-            boolean downButton = gamepad1.dpad_down;
+            double upForce = gamepad1.left_trigger;
+            double downForce = gamepad1.right_trigger;
+            boolean clawClose = gamepad1.left_bumper;
+            boolean clawOpen = gamepad1.right_bumper;
 
-            // Calculate voltage multipliers
+            // Calculate voltage multipliers for wheels
             // Based on Taheri, Qiao, & Ghaeminezhad (2015) in the IJCA
             //          "Kinematic Model of a Four Mecanum Wheeled Mobile Robot"
             double voltLF = y - x - rx;
@@ -66,32 +69,38 @@ public class TestDrive extends LinearOpMode
             double voltLR = y + x - rx;
             double voltRR = y - x + rx;
 
-            // Adjust calculations for values greater than the maximum (1.0)
+            // Adjust wheel calculations for values greater than the maximum (1.0)
             double largest = 1.0;
-            largest = Math.max(largest, Math.abs(voltLF));
-            largest = Math.max(largest, Math.abs(voltRF));
-            largest = Math.max(largest, Math.abs(voltLR));
-            largest = Math.max(largest, Math.abs(voltRR));
+                   largest = Math.max(largest, Math.abs(voltLF));
+                   largest = Math.max(largest, Math.abs(voltRF));
+                   largest = Math.max(largest, Math.abs(voltLR));
+                   largest = Math.max(largest, Math.abs(voltRR));
 
-            // Move arm up when X button is pressed
-            if (upButton)
+            // Calculate voltage multipliers for arm
+            // Left trigger is up; right trigger is down
+            // TODO: At no pressure, keep still
+            double voltArm = upForce - downForce;
+
+            // Calculate voltage multipliers for claw
+            // Left bumper is close; right bumper is open
+            // TODO: When both pressed, favor most recently pushed
+            double voltClaw = 0.0;
+            if (clawClose)
             {
-                armMotor.setPower(1.0);
+                voltClaw = 0.5;
             }
-            else if (downButton)
+            else if (clawOpen)
             {
-                armMotor.setPower(-1.0);
-            }
-            else
-            {
-                armMotor.setPower(0.1);
+                voltClaw = -0.5;
             }
 
-            // Move wheels
+            // Power motors and servo
             leftFront.setPower(voltLF / largest);
             rightFront.setPower(voltRF / largest);
             leftRear.setPower(voltLR / largest);
             rightRear.setPower(voltRR / largest);
+            armMotor.setPower(voltArm);
+            clawServo.setPower(voltClaw);
         }
     }
 }
