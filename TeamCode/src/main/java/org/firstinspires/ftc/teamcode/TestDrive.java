@@ -7,13 +7,12 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 /**
- *  A basic driving op-mode for testing the chassis.
- *  Robot-oriented.
+ *  Our driver-controlled, robot-oriented op-mode.
  *
  *  Uses linear algebra to calculate voltage multipliers for mecanums.
  */
 
-@TeleOp(name="TeleOpAddition")
+@TeleOp(name="TeleOp")
 public class TestDrive extends LinearOpMode
 {
     @Override
@@ -70,9 +69,13 @@ public class TestDrive extends LinearOpMode
             double voltLR = (y - x - rx) / largest;
             double voltRR = (y + x - rx) / largest;
 
+            // TODO: Make "slow-mode" that halves motor speed
+
             // Calculate voltage multipliers for arm
             // Left trigger is up; right trigger is down
             // TODO: At no pressure, keep still
+            // TODO: Allow second driver's control
+            // TODO: Make button presets for low, medium, and high (ground?)
             double voltArm = upForce - downForce;
 
             // Calculate voltage multipliers for claw
@@ -89,10 +92,10 @@ public class TestDrive extends LinearOpMode
             }
 
             // Power motors and servo
-            leftFront.setPower(voltLF / largest);
-            rightFront.setPower(voltRF / largest);
-            leftRear.setPower(voltLR / largest);
-            rightRear.setPower(voltRR / largest);
+            leftFront.setPower(voltLF);
+            rightFront.setPower(voltRF);
+            leftRear.setPower(voltLR);
+            rightRear.setPower(voltRR);
             armMotor.setPower(voltArm);
             clawServo.setPower(voltClaw);
         }

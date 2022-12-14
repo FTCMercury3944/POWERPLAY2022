@@ -122,44 +122,35 @@ public class Auton extends LinearOpMode
             sleep(20);
         }
 
-        // Show end point
-        if(tagOfInterest != null)
-        {
-            telemetry.addLine(String.format(Locale.ENGLISH, "Parking zone %s!", numToZone(tagOfInterest.id)));
-        }
-        else
-        {
-            telemetry.addLine("No tag found.");
-        }
-
-        telemetry.update();
-
         // Move
         if (tagOfInterest == null || tagOfInterest.id == LEFT) {
-            // left or default
+            // Left or default
             strafeDrive(DRIVE_SPEED, -12, 5);
-            encoderDrive(DRIVE_SPEED, -24, 6);
+            encoderDrive(DRIVE_SPEED, 22.5, 5);
         } else if (tagOfInterest.id == MIDDLE) {
-            // middle
-            encoderDrive(DRIVE_SPEED, -20.5, 6);
+            // Middle
+            encoderDrive(DRIVE_SPEED, 22.5, 5);
         } else {
-            // right
+            // Right
             strafeDrive(DRIVE_SPEED, 12, 5);
-            encoderDrive(DRIVE_SPEED, -24, 6);
+            encoderDrive(DRIVE_SPEED, 22.5, 5);
         }
     }
 
     /**
-     *  Converts a number from 1 through 3 to the parking zone name
+     *  Uses encoders to drive a specified distance forward at a specified speed
      *
-     *  @param parkingZoneId Number representing parking zone (1, 2, or 3)
-     *  @return Parking zone name (left, middle, or right)
+     *  @param voltage The power (-1.0 to 1.0) to send to each motor
+     *  @param distance The distance, in inches, a robot should travel forward;
+     *                  positive is forward
+     *  @param timeout The time, in seconds, that a robot should have completed the
+     *                 routine by; if it hasn't, abort the routine
      */
-    private String numToZone(int parkingZoneId) {
-        return new String[]{"left", "middle", "right"}[parkingZoneId - 1];
-    }
+    public void encoderDrive(double voltage, double distance, double timeout)
+    {
+        // Calculate distance
+        int counts = (int)(-distance * COUNTS_PER_INCH);
 
-    public void encoderDrive(double speed, double inches, double timeoutS) {
         // Initialize the DC motors for each wheel
         // Declare op-mode members
         DcMotor leftFront = hardwareMap.get(DcMotor.class, "leftFront");
@@ -177,67 +168,66 @@ public class Auton extends LinearOpMode
         leftRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        int newLeftFrontTarget;
-        int newRightFrontTarget;
-        int newLeftRearTarget;
-        int newRightRearTarget;
+        // Determine new target positions
+        int newLeftFrontTarget = leftFront.getCurrentPosition() + counts;
+        int newRightFrontTarget = rightFront.getCurrentPosition() + counts;
+        int newLeftRearTarget = leftRear.getCurrentPosition() + counts;
+        int newRightRearTarget = rightRear.getCurrentPosition() + counts;
 
-        // Determine new target position, and pass to motor controller
-        newLeftFrontTarget = leftFront.getCurrentPosition() + (int)(inches * COUNTS_PER_INCH);
-        newRightFrontTarget = rightFront.getCurrentPosition() + (int)(inches * COUNTS_PER_INCH);
-        newLeftRearTarget = leftRear.getCurrentPosition() + (int)(inches * COUNTS_PER_INCH);
-        newRightRearTarget = rightRear.getCurrentPosition() + (int)(inches * COUNTS_PER_INCH);
+        // Pass target positions to motor controllers
         leftFront.setTargetPosition(newLeftFrontTarget);
         rightFront.setTargetPosition(newRightFrontTarget);
         leftRear.setTargetPosition(newLeftRearTarget);
         rightRear.setTargetPosition(newRightRearTarget);
 
-        // Turn On RUN_TO_POSITION
+        // Begin running routine
         leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         leftRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         rightRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
-        // reset the timeout time and start motion.
+        // Reset the timeout time and start motion
         RUNTIME.reset();
-        leftFront.setPower(-speed);
-        rightFront.setPower(Math.abs(speed));
-        leftRear.setPower(Math.abs(speed));
-        rightRear.setPower(-speed);
+        leftFront.setPower(-voltage);
+        rightFront.setPower(Math.abs(voltage));
+        leftRear.setPower(Math.abs(voltage));
+        rightRear.setPower(-voltage);
 
-
-        // keep looping while we are still active, and there is time left, and both motors are running.
-        // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
-        // its target position, the motion will stop.  This is "safer" in the event that the robot will
-        // always end the motion as soon as possible.
-        // However, if you require that BOTH motors have finished their moves before the robot continues
-        // onto the next step, use (isBusy() || isBusy()) in the loop test.
+        // Keep running while the routine are still active, the timeout has not
+        // elapsed, and both motors are still running
         while (opModeIsActive() &&
-                (RUNTIME.seconds() < timeoutS) &&
-                (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy())) {
-
-            // Display it for the driver.
-            telemetry.addData("Path1",  "Running to %7d :%7d :%7d :%7d", newLeftFrontTarget,  newRightFrontTarget, newRightRearTarget, newLeftRearTarget);
-            telemetry.addData("Path2",  "Running at %7d :%7d :%7d :%7d", leftFront.getCurrentPosition(), rightFront.getCurrentPosition(), rightRear.getCurrentPosition(), leftRear.getCurrentPosition());
-            telemetry.update();
+              (RUNTIME.seconds() < timeout) &&
+              (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy())) {
+            // Blocking; no internal code
         }
 
-        // Stop all motion;
-        leftFront.setPower(0);
-        rightFront.setPower(0);
-        rightRear.setPower(0);
-        leftRear.setPower(0);
+        // Stop all motion
+        leftFront.setPower(0.0);
+        rightFront.setPower(0.0);
+        rightRear.setPower(0.0);
+        leftRear.setPower(0.0);
 
-        // Turn off RUN_TO_POSITION
+        // Stop running to position
         leftFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rightFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         leftRear.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rightRear.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-
-        sleep(250);   // optional pause after each move
     }
 
-    public void strafeDrive(double speed, double inches, double timeoutS) {
+    /**
+     *  Uses encoders to drive a specified distance sideways at a specified speed
+     *
+     *  @param voltage The power (-1.0 to 1.0) to send to each motor
+     *  @param distance The distance, in inches, a robot should travel sideways;
+     *                  positive is right
+     *  @param timeout The time, in seconds, that a robot should have completed the
+     *                 routine by; if it hasn't, abort the routine
+     */
+    public void strafeDrive(double voltage, double distance, double timeout)
+    {
+        // Calculate distance
+        int counts = (int)(-distance * COUNTS_PER_INCH);
+
         // Initialize the DC motors for each wheel
         // Declare op-mode members
         DcMotor leftFront = hardwareMap.get(DcMotor.class, "leftFront");
@@ -255,62 +245,49 @@ public class Auton extends LinearOpMode
         leftRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        int newLeftFrontTarget;
-        int newRightFrontTarget;
-        int newLeftRearTarget;
-        int newRightRearTarget;
-
         // Determine new target position, and pass to motor controller
-        newLeftFrontTarget = leftFront.getCurrentPosition() + (int)(inches * COUNTS_PER_INCH);
-        newRightFrontTarget = rightFront.getCurrentPosition() + (int)(-inches * COUNTS_PER_INCH);
-        newLeftRearTarget = leftRear.getCurrentPosition() + (int)(-inches * COUNTS_PER_INCH);
-        newRightRearTarget = rightRear.getCurrentPosition() + (int)(inches * COUNTS_PER_INCH);
+        int newLeftFrontTarget = leftFront.getCurrentPosition() + counts;
+        int newRightFrontTarget = rightFront.getCurrentPosition() + -counts;
+        int newLeftRearTarget = leftRear.getCurrentPosition() + -counts;
+        int newRightRearTarget = rightRear.getCurrentPosition() + counts;
+
+        // Pass target positions to motor controllers
         leftFront.setTargetPosition(newLeftFrontTarget);
         rightFront.setTargetPosition(newRightFrontTarget);
         leftRear.setTargetPosition(newLeftRearTarget);
         rightRear.setTargetPosition(newRightRearTarget);
 
-        // Turn On RUN_TO_POSITION
+        // Begin running routine
         leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         leftRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         rightRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
-        // reset the timeout time and start motion.
+        // Reset the timeout time and start motion
         RUNTIME.reset();
-        leftFront.setPower(-speed);
-        rightFront.setPower(-speed);
-        leftRear.setPower(-speed);
-        rightRear.setPower(-speed);
+        leftFront.setPower(-voltage);
+        rightFront.setPower(-voltage);
+        leftRear.setPower(-voltage);
+        rightRear.setPower(-voltage);
 
-        // keep looping while we are still active, and there is time left, and both motors are running.
-        // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
-        // its target position, the motion will stop.  This is "safer" in the event that the robot will
-        // always end the motion as soon as possible.
-        // However, if you require that BOTH motors have finished their moves before the robot continues
-        // onto the next step, use (isBusy() || isBusy()) in the loop test.
+        // Keep running while the routine are still active, the timeout has not
+        // elapsed, and both motors are still running
         while (opModeIsActive() &&
-                (RUNTIME.seconds() < timeoutS) &&
-                (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy())) {
-
-            // Display it for the driver.
-            telemetry.addData("Path1",  "Running to %7d :%7d :%7d :%7d", newLeftFrontTarget,  newRightFrontTarget, newRightRearTarget, newLeftRearTarget);
-            telemetry.addData("Path2",  "Running at %7d :%7d :%7d :%7d", leftFront.getCurrentPosition(), rightFront.getCurrentPosition(), rightRear.getCurrentPosition(), leftRear.getCurrentPosition());
-            telemetry.update();
+              (RUNTIME.seconds() < timeout) &&
+              (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy())) {
+            // Blocking; no internal code
         }
 
-        // Stop all motion;
-        leftFront.setPower(0);
-        rightFront.setPower(0);
-        rightRear.setPower(0);
-        leftRear.setPower(0);
+        // Stop all motion
+        leftFront.setPower(0.0);
+        rightFront.setPower(0.0);
+        rightRear.setPower(0.0);
+        leftRear.setPower(0.0);
 
-        // Turn off RUN_TO_POSITION
+        // Stop running to position
         leftFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rightFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         leftRear.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rightRear.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-
-        sleep(250);   // optional pause after each move
     }
 }
