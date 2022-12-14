@@ -13,7 +13,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
  *  Uses linear algebra to calculate voltage multipliers for mecanums.
  */
 
-@TeleOp(name="TeleOp")
+@TeleOp(name="TeleOpAddition")
 public class TestDrive extends LinearOpMode
 {
     @Override
@@ -61,13 +61,22 @@ public class TestDrive extends LinearOpMode
             boolean clawClose = gamepad1.left_bumper;
             boolean clawOpen = gamepad1.right_bumper;
 
+
             // Calculate voltage multipliers for wheels
+            // Trigonometry-based calculation
+            double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
+            double voltLF = (y + x + rx) / denominator;
+            double voltRF = (y - x + rx) / denominator;
+            double voltLR = (y - x - rx) / denominator;
+            double voltRR = (y + x - rx) / denominator;
+
+            // Arithmetic-based calculation
             // Based on Taheri, Qiao, & Ghaeminezhad (2015) in the IJCA
             //          "Kinematic Model of a Four Mecanum Wheeled Mobile Robot"
-            double voltLF = y - x - rx;
-            double voltRF = y + x + rx;
-            double voltLR = y + x - rx;
-            double voltRR = y - x + rx;
+            // double voltLF = y - x - rx;
+            // double voltRF = y + x + rx;
+            // double voltLR = y + x - rx;
+            // double voltRR = y - x + rx;
 
             // Adjust wheel calculations for values greater than the maximum (1.0)
             double largest = 1.0;
@@ -87,11 +96,11 @@ public class TestDrive extends LinearOpMode
             double voltClaw = 0.0;
             if (clawClose)
             {
-                voltClaw = 0.5;
+                voltClaw = 1;
             }
-            else if (clawOpen)
+            if (clawOpen)
             {
-                voltClaw = -0.5;
+                voltClaw = -1;
             }
 
             // Power motors and servo

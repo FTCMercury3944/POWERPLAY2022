@@ -1,2 +1,7 @@
 - Auton movement to parking zone
-- Claw and arm programming
+- Op-mode for second driver to push up elevator
+- Create "slow-mode" where motor values are halved on the press of A
+
+RoadRunner
+- Tune ./drive/DriveConstants.java
+-
