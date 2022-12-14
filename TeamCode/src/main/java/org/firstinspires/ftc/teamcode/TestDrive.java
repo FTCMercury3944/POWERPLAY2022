@@ -61,29 +61,14 @@ public class TestDrive extends LinearOpMode
             boolean clawClose = gamepad1.left_bumper;
             boolean clawOpen = gamepad1.right_bumper;
 
-
             // Calculate voltage multipliers for wheels
-            // Trigonometry-based calculation
-            double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
-            double voltLF = (y + x + rx) / denominator;
-            double voltRF = (y - x + rx) / denominator;
-            double voltLR = (y - x - rx) / denominator;
-            double voltRR = (y + x - rx) / denominator;
-
-            // Arithmetic-based calculation
             // Based on Taheri, Qiao, & Ghaeminezhad (2015) in the IJCA
             //          "Kinematic Model of a Four Mecanum Wheeled Mobile Robot"
-            // double voltLF = y - x - rx;
-            // double voltRF = y + x + rx;
-            // double voltLR = y + x - rx;
-            // double voltRR = y - x + rx;
-
-            // Adjust wheel calculations for values greater than the maximum (1.0)
-            double largest = 1.0;
-                   largest = Math.max(largest, Math.abs(voltLF));
-                   largest = Math.max(largest, Math.abs(voltRF));
-                   largest = Math.max(largest, Math.abs(voltLR));
-                   largest = Math.max(largest, Math.abs(voltRR));
+            double largest = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1.0);
+            double voltLF = (y + x + rx) / largest;
+            double voltRF = (y - x + rx) / largest;
+            double voltLR = (y - x - rx) / largest;
+            double voltRR = (y + x - rx) / largest;
 
             // Calculate voltage multipliers for arm
             // Left trigger is up; right trigger is down
