@@ -85,3 +85,6 @@ lint/generated/
 lint/outputs/
 lint/tmp/
 # lint/reports/
+
+# Test programs
+TeamCode/src/main/java/org/firstinspires/ftc/teamcode/TestArm.java

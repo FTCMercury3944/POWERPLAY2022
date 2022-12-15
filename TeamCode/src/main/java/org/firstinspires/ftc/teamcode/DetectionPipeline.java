@@ -18,7 +18,7 @@ import org.openftc.easyopencv.OpenCvPipeline;
 import java.util.ArrayList;
 
 /**
- *  AprilTag detection pipeline, for use in Autonomous mode
+ *  AprilTag detection pipeline, for use in Autonomous mode.
  */
 
 class DetectionPipeline extends OpenCvPipeline
@@ -44,9 +44,8 @@ class DetectionPipeline extends OpenCvPipeline
     // Side length of square tag in meters
     private final double TAG_SIZE;
 
-    private float decimation;
     private boolean needToSetDecimation;
-    private final Object decimationSync = new Object();
+    private final Object DECIMATION_SYNC = new Object();
 
     public DetectionPipeline(double tagSize, double fx, double fy, double cx, double cy)
     {
@@ -63,6 +62,9 @@ class DetectionPipeline extends OpenCvPipeline
         nativeAprilTagPtr = AprilTagDetectorJNI.createApriltagDetector(AprilTagDetectorJNI.TagFamily.TAG_36h11.string, 3, 3);
     }
 
+    /**
+     *  End routine.
+     */
     @Override
     protected void finalize()
     {
@@ -74,6 +76,11 @@ class DetectionPipeline extends OpenCvPipeline
         }
     }
 
+    /**
+     *  Finds AprilTag in the provided frame of video capture.
+     *
+     *  @param input The provided frame of video
+     */
     @Override
     public Mat processFrame(Mat input)
     {
@@ -81,11 +88,11 @@ class DetectionPipeline extends OpenCvPipeline
         Imgproc.cvtColor(input, GRAY, Imgproc.COLOR_RGBA2GRAY);
 
         // Set decimation parameter
-        synchronized (decimationSync)
+        synchronized (DECIMATION_SYNC)
         {
             if (needToSetDecimation)
             {
-                AprilTagDetectorJNI.setApriltagDetectorDecimation(nativeAprilTagPtr, decimation);
+                AprilTagDetectorJNI.setApriltagDetectorDecimation(nativeAprilTagPtr, 0.0f);
                 needToSetDecimation = false;
             }
         }
@@ -97,21 +104,29 @@ class DetectionPipeline extends OpenCvPipeline
         for (AprilTagDetection detection : detections)
         {
             Pose pose = poseFromTrapezoid(detection.corners, cameraMatrix);
-            drawAxisMarker(input, TAG_SIZE/2.0, 6, pose.rvec, pose.tvec, cameraMatrix);
+            drawAxisMarker(input, TAG_SIZE / 2.0, 6, pose.rvec, pose.tvec, cameraMatrix);
             draw3dCubeMarker(input, TAG_SIZE, TAG_SIZE, TAG_SIZE, 5, pose.rvec, pose.tvec, cameraMatrix);
         }
 
         return input;
     }
 
+    /**
+     *  Gets the list of detections per frame.
+     *
+     *  @return ArrayList of detections
+     */
     public ArrayList<AprilTagDetection> getLatestDetections()
     {
         return detections;
     }
 
+    /**
+     *  Constructs the camera matrix for use by OpenCV.
+     */
     private void constructMatrix()
     {
-        // Construct the camera matrix.
+        // Matrix:
         //        ┌------------┐
         //        | fx  0   cx |
         //        | 0   fy  cy |
@@ -137,7 +152,7 @@ class DetectionPipeline extends OpenCvPipeline
     }
 
     /**
-     *  Draw a 3D axis marker on a detection
+     *  Draw a 3D axis to mark a detection.
      *
      *  @param buf The RGB buffer on which to draw the marker
      *  @param length The length of each of the marker 'poles'
@@ -169,6 +184,18 @@ class DetectionPipeline extends OpenCvPipeline
         Imgproc.circle(buf, projectedPoints[0], thickness, WHITE, -1);
     }
 
+    /**
+     *  Draw a 3D cube to mark a detection.
+     *
+     *  @param buf The RGB buffer on which to draw the marker
+     *  @param length The length of each of the marker 'poles'
+     *  @param tagWidth Width of the AprilTag
+     *  @param tagHeight Height of the AprilTag
+     *  @param thickness Thickness of the cube
+     *  @param rvec The rotation vector of the detection
+     *  @param tvec The translation vector of the detection
+     *  @param cameraMatrix The camera matrix used when finding the detection
+     */
     void draw3dCubeMarker(Mat buf, double length, double tagWidth, double tagHeight, int thickness, Mat rvec, Mat tvec, Mat cameraMatrix)
     {
         // The points in 3D space we wish to project onto the 2D image plane
@@ -181,7 +208,8 @@ class DetectionPipeline extends OpenCvPipeline
                 new Point3(-tagWidth/2, tagHeight/2,-length),
                 new Point3( tagWidth/2, tagHeight/2,-length),
                 new Point3( tagWidth/2,-tagHeight/2,-length),
-                new Point3(-tagWidth/2,-tagHeight/2,-length));
+                new Point3(-tagWidth/2,-tagHeight/2,-length)
+        );
 
         // Project points
         MatOfPoint2f matProjectedPoints = new MatOfPoint2f();
@@ -202,7 +230,7 @@ class DetectionPipeline extends OpenCvPipeline
     }
 
     /**
-     *  Extracts 6DOF pose from a trapezoid
+     *  Extracts 6DOF pose from a trapezoid.
      *
      *  @param points The points which form the trapezoid
      *  @param cameraMatrix The camera intrinsics matrix
@@ -215,10 +243,10 @@ class DetectionPipeline extends OpenCvPipeline
 
         // The 3d points of the tag in an "ideal projection"
         Point3[] arrayPoints3d = new Point3[4];
-        arrayPoints3d[0] = new Point3(-TAG_SIZE/2, TAG_SIZE/2, 0);
-        arrayPoints3d[1] = new Point3(TAG_SIZE/2, TAG_SIZE/2, 0);
-        arrayPoints3d[2] = new Point3(TAG_SIZE/2, -TAG_SIZE/2, 0);
-        arrayPoints3d[3] = new Point3(-TAG_SIZE/2, -TAG_SIZE/2, 0);
+        arrayPoints3d[0] = new Point3(-TAG_SIZE / 2, TAG_SIZE / 2, 0);
+        arrayPoints3d[1] = new Point3(TAG_SIZE / 2, TAG_SIZE / 2, 0);
+        arrayPoints3d[2] = new Point3(TAG_SIZE / 2, -TAG_SIZE / 2, 0);
+        arrayPoints3d[3] = new Point3(-TAG_SIZE / 2, -TAG_SIZE / 2, 0);
         MatOfPoint3f points3d = new MatOfPoint3f(arrayPoints3d);
 
         // Solve for pose
