@@ -28,19 +28,22 @@ public class TestDrive extends LinearOpMode
         DcMotor rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         DcMotor leftRear = hardwareMap.get(DcMotor.class, "leftRear");
         DcMotor rightRear = hardwareMap.get(DcMotor.class, "rightRear");
-        DcMotor armMotor = hardwareMap.get(DcMotor.class, "lift");
+        DcMotor leftArm = hardwareMap.get(DcMotor.class, "arm2");
+        DcMotor rightArm = hardwareMap.get(DcMotor.class, "lift");
         CRServo clawServo = hardwareMap.get(CRServo.class, "claw");
 
         // Reverse right side
         rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
         rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightArm.setDirection(DcMotorSimple.Direction.REVERSE);
 
         // Resist external force to motor
         leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         leftRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         rightRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        armMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftArm.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightArm.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // Wait for driver to press play
         waitForStart();
@@ -49,6 +52,10 @@ public class TestDrive extends LinearOpMode
         {
             return;
         }
+
+        boolean slow = false;
+        boolean isHeld = false;
+        double slowFactor = 1.0;
 
         while (opModeIsActive())
         {
@@ -59,6 +66,21 @@ public class TestDrive extends LinearOpMode
             double downForce = gamepad1.right_trigger;
             boolean clawClose = gamepad1.left_bumper;
             boolean clawOpen = gamepad1.right_bumper;
+            boolean slowToggled = gamepad1.a;
+
+            // Slow-mode when A is pressed (halves motor speeds)
+            if (slowToggled && !isHeld)
+            {
+                // Button is being pressed for the first time
+                // Set slow-mode
+                slow = !slow;
+                slowFactor = slow ? 0.5 : 1.0;
+                isHeld = true;
+            }
+            else if (!slowToggled && isHeld)
+            {
+                isHeld = false;
+            }
 
             // Calculate voltage multipliers for wheels
             // Based on Taheri, Qiao, & Ghaeminezhad (2015) in the IJCA
@@ -69,14 +91,12 @@ public class TestDrive extends LinearOpMode
             double voltLR = (y - x - rx) / largest;
             double voltRR = (y + x - rx) / largest;
 
-            // TODO: Make "slow-mode" that halves motor speed
-
             // Calculate voltage multipliers for arm
             // Left trigger is up; right trigger is down
             // TODO: At no pressure, keep still
             // TODO: Allow second driver's control
             // TODO: Make button presets for low, medium, and high (ground?)
-            double voltArm = upForce - downForce;
+            double voltArm = upForce - (downForce * 0.7);
 
             // Calculate voltage multipliers for claw
             // Left bumper is close; right bumper is open
@@ -92,12 +112,13 @@ public class TestDrive extends LinearOpMode
             }
 
             // Power motors and servo
-            leftFront.setPower(voltLF);
-            rightFront.setPower(voltRF);
-            leftRear.setPower(voltLR);
-            rightRear.setPower(voltRR);
-            armMotor.setPower(voltArm);
-            clawServo.setPower(voltClaw);
+            leftFront.setPower(voltLF * slowFactor);
+            rightFront.setPower(voltRF * slowFactor);
+            leftRear.setPower(voltLR * slowFactor);
+            rightRear.setPower(voltRR * slowFactor);
+            leftArm.setPower(voltArm * slowFactor);
+            rightArm.setPower(voltArm * slowFactor);
+            clawServo.setPower(voltClaw * slowFactor);
         }
     }
 }

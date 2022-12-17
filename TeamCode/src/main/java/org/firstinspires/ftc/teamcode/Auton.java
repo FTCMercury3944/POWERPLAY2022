@@ -192,8 +192,8 @@ public class Auton extends LinearOpMode
         DcMotor rightRear = hardwareMap.get(DcMotor.class, "rightRear");
 
         // Reverse right side
-        rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
         rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
 
         // Resist external force to motor
         leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
