@@ -1,9 +1,13 @@
 package org.firstinspires.ftc.teamcode;
 
+import android.graphics.Color;
+
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
+import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -42,8 +46,17 @@ public class Auton extends LinearOpMode
     private AprilTagDetection tagOfInterest;
     private OpenCvCamera camera;
 
+    // Variables for color detection
+    private int yellowDetections = 0;
+    private boolean isYellowBuffer = false;
+    private boolean poleEnded = false;
+    private float[] hsvValues = new float[3];
+
     // Side length of square tag in meters
     private static final double TAG_SIZE = 0.166;
+
+    // Brightness gain for color sensor
+    private static final float GAIN = 20;
 
     // Lens intrinsics for Logitech C920 webcam
     // (FX, FY) is focal length in pixels
@@ -59,12 +72,13 @@ public class Auton extends LinearOpMode
     private static final int RIGHT = 3;
 
     private final ElapsedTime RUNTIME = new ElapsedTime();
-    static final double COUNTS_PER_MOTOR_REV = 1120;
-    static final double DRIVE_GEAR_REDUCTION = 1.0;
-    static final double WHEEL_DIAMETER_INCHES = 4.0;
-    static final double COUNTS_PER_INCH = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
-                                          (WHEEL_DIAMETER_INCHES * 3.1415);
-    static final double DRIVE_SPEED = 0.5;
+    private static final double COUNTS_PER_MOTOR_REV = 1120;
+    private static final double DRIVE_GEAR_REDUCTION = 1.0;
+    private static final double WHEEL_DIAMETER_INCHES = 4.0;
+    private static final double COUNTS_PER_INCH = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
+                                                  (WHEEL_DIAMETER_INCHES * 3.1415);
+    private static final double DRIVE_SPEED = 0.5;
+    private static final double DETECTION_SPEED = 0.1;
 
     @Override
     public void runOpMode()
@@ -92,10 +106,15 @@ public class Auton extends LinearOpMode
             }
         });
 
+        // Initialize color sensor gain
+        NormalizedColorSensor colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+        colorSensor.setGain(GAIN);
+
         // Wait for game to begin
         waitForStart();
 
         // Detect AprilTag
+        /*
         boolean tagFound = false;
         while (isStarted() && !tagFound && !isStopRequested())
         {
@@ -116,13 +135,15 @@ public class Auton extends LinearOpMode
 
             sleep(20);
         }
+         */
 
+        /*
         // Move for auton
         if (tagOfInterest == null || tagOfInterest.id == LEFT)
         {
             // Left or default
-            driveSideways(-12);
-            driveForward(22.5);
+            driveSideways(-14);
+            driveForward(16);
         }
         else if (tagOfInterest.id == MIDDLE)
         {
@@ -132,9 +153,10 @@ public class Auton extends LinearOpMode
         else
         {
             // Right
-            driveSideways(-12);
-            driveForward(22.5);
+            driveSideways(14);
+            driveForward(16);
         }
+         */
     }
 
     /**
@@ -145,23 +167,31 @@ public class Auton extends LinearOpMode
      */
     public void driveForward(double distance)
     {
-        encoderDrive(DRIVE_SPEED, distance, 5, false);
+        encoderDrive(DRIVE_SPEED, distance, 5, false, false);
     }
 
     /**
-     *  Calls encoderDrive() to move forward a specified distance.
+     *  Calls encoderDrive() to move sideways a specified distance.
      *
      *  @param distance The distance, in inches, a robot should travel sideways;
      *                  positive is right
      */
     public void driveSideways(double distance)
     {
-        encoderDrive(DRIVE_SPEED, distance, 5, true);
+        encoderDrive(DRIVE_SPEED, distance, 5, true, false);
     }
 
     /**
-     *  Uses encoders to drive a specified distance in a specified direction
-     *  at a specified speed.
+     *  Calls encoderDrive() to move sideways until the center of a pole is reached.
+     *  Moves right.
+     */
+    public void detectPole()
+    {
+        encoderDrive(DETECTION_SPEED, 100, 10, true, true); // second parameter overshoots for safety
+    }
+
+    /**
+     *  Uses encoders to drive a specified distance in a specified direction at a specified speed.
      *
      *  @param voltage The power (-1.0 to 1.0) to send to each motor
      *  @param distance The distance, in inches, a robot should travel sideways;
@@ -169,8 +199,9 @@ public class Auton extends LinearOpMode
      *  @param timeout The time, in seconds, that a robot should have completed the
      *                 routine by; if it hasn't, abort the routine
      *  @param sidewaysSwitch If true, move left/right; if false, more forward/backward
+     *  @param toScanPole If true, move slowly and scan for a pole
      */
-    public void encoderDrive(double voltage, double distance, double timeout, boolean sidewaysSwitch)
+    public void encoderDrive(double voltage, double distance, double timeout, boolean sidewaysSwitch, boolean toScanPole)
     {
         // Calculate distance
         int counts = (int)(-distance * COUNTS_PER_INCH);
@@ -228,10 +259,48 @@ public class Auton extends LinearOpMode
 
         // Keep running while the routine are still active, the timeout has not
         // elapsed, and both motors are still running
+        long startTime = System.nanoTime();
         while (opModeIsActive() &&
-                (RUNTIME.seconds() < timeout) &&
-                (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy())) {
-            // Blocking; no internal code
+              (RUNTIME.seconds() < timeout) &&
+              (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy()) &&
+              (!poleEnded && toScanPole)) {
+            getYellows();
+        }
+        long duration = System.nanoTime() - startTime;
+
+        // Second run back when scanning for pole
+        if (toScanPole)
+        {
+            int backtrackLeftFrontTarget = leftFront.getCurrentPosition() - counts;
+            int backtrackRightFrontTarget = rightFront.getCurrentPosition() - directionalCounts;
+            int backtrackLeftRearTarget = leftRear.getCurrentPosition() - directionalCounts;
+            int backtrackRightRearTarget = rightRear.getCurrentPosition() - counts;
+
+            // Pass target positions to motor controllers
+            leftFront.setTargetPosition(backtrackLeftFrontTarget);
+            rightFront.setTargetPosition(backtrackRightFrontTarget);
+            leftRear.setTargetPosition(backtrackLeftRearTarget);
+            rightRear.setTargetPosition(backtrackRightRearTarget);
+
+            // Begin running routine
+            leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            leftRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            rightRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+            // Reset the timeout time and start motion
+            RUNTIME.reset();
+            leftFront.setPower(-voltage);
+            rightFront.setPower(directionalVoltage);
+            leftRear.setPower(directionalVoltage);
+            rightRear.setPower(-voltage);
+
+            while (opModeIsActive() &&
+                  (RUNTIME.seconds() < timeout) &&
+                  (RUNTIME.seconds() < (duration / 2.0)) &&
+                  (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy())) {
+                // Stall for backtracking
+            }
         }
 
         // Stop all motion
@@ -245,5 +314,42 @@ public class Auton extends LinearOpMode
         rightFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         leftRear.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rightRear.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+    }
+
+    /**
+     *  Gets whether yellow is visible to the color sensor and adds to the detection count.
+     */
+    public void getYellows()
+    {
+        NormalizedColorSensor colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+
+        NormalizedRGBA colors = colorSensor.getNormalizedColors();
+        Color.colorToHSV(colors.toColor(), hsvValues);
+
+        boolean isYellow = 28 < hsvValues[0] && hsvValues[0] < 36;
+
+        if ((isYellow && isYellowBuffer) || (isYellowBuffer && yellowDetections > 0))
+        {
+            yellowDetections++;
+            poleEnded = false;
+        }
+        else if (yellowDetections > 0)
+        {
+            poleEnded = true;
+        }
+
+        isYellowBuffer = isYellow;
+
+        telemetry.addData("detections", "%d", yellowDetections);
+        telemetry.addData("yellow?", "%s", isYellow ? "true" : "false");
+        telemetry.addLine()
+                 .addData("red", "%.3f", colors.red)
+                 .addData("green", "%.3f", colors.green)
+                 .addData("blue", "%.3f", colors.blue);
+        telemetry.addLine()
+                 .addData("hue", "%.3f", hsvValues[0])
+                 .addData("saturation", "%.3f", hsvValues[1])
+                 .addData("value", "%.3f", hsvValues[2]);
+        telemetry.update();
     }
 }
