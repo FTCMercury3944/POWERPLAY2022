@@ -114,7 +114,6 @@ public class Auton extends LinearOpMode
         waitForStart();
 
         // Detect AprilTag
-        /*
         boolean tagFound = false;
         while (isStarted() && !tagFound && !isStopRequested())
         {
@@ -135,9 +134,7 @@ public class Auton extends LinearOpMode
 
             sleep(20);
         }
-         */
 
-        /*
         // Move for auton
         if (tagOfInterest == null || tagOfInterest.id == LEFT)
         {
@@ -156,7 +153,6 @@ public class Auton extends LinearOpMode
             driveSideways(14);
             driveForward(16);
         }
-         */
     }
 
     /**
@@ -334,9 +330,7 @@ public class Auton extends LinearOpMode
             poleEnded = false;
         }
         else if (yellowDetections > 0)
-        {
             poleEnded = true;
-        }
 
         isYellowBuffer = isYellow;
 

@@ -2,15 +2,9 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.DistanceSensor;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.DcMotor;
-
-import com.qualcomm.hardware.rev.Rev2mDistanceSensor;
-
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-
-import java.util.Locale;
 
 /**
  *  A basic driving op-mode for testing the chassis.
@@ -52,16 +46,18 @@ public class TestDrive extends LinearOpMode
         arm1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         arm2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        double voltClaw = 0;
+        // Operation variables
+        int slowFactor;
+        double voltClaw = 0.0;
         boolean slow = false;
-        int slowFactor = 0;
 
         // Wait for driver to press play
         waitForStart();
 
-        if (isStopRequested())
-            return;
+        if (isStopRequested()) return;
 
+        // TODO: When aligned, low vibration; when close enough, high vibration
+        //
         while (opModeIsActive())
         {
             double y = -gamepad1.left_stick_y;
@@ -79,8 +75,7 @@ public class TestDrive extends LinearOpMode
 
             // Slow mode activation upon pressing A
             // Halves movement speed values
-            if (gamepad1.a)
-                slow = !slow;
+            if (gamepad1.a) slow = !slow;
 
             slowFactor = slow ? 2 : 1;
 
@@ -101,10 +96,8 @@ public class TestDrive extends LinearOpMode
             // Calculate voltage multipliers for claw
             // Left bumper is close; right bumper is open
             // TODO: When both pressed, favor most recently pushed
-            if (gamepad1.left_bumper)
-                voltClaw = 0;
-            if (gamepad1.right_bumper)
-                voltClaw = 1;
+            if (gamepad1.left_bumper) voltClaw = 0;
+            if (gamepad1.right_bumper) voltClaw = 1;
 
             // Power motors and servo
             arm1.setPower(voltArm);
