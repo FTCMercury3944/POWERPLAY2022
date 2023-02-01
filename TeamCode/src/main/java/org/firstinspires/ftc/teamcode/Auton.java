@@ -1,22 +1,22 @@
 package org.firstinspires.ftc.teamcode;
 
-import android.graphics.Color;
-
+import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
-import com.qualcomm.robotcore.hardware.NormalizedRGBA;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 import org.openftc.apriltag.AprilTagDetection;
 import org.openftc.easyopencv.OpenCvCamera;
 import org.openftc.easyopencv.OpenCvCameraFactory;
 import org.openftc.easyopencv.OpenCvCameraRotation;
-
-import java.util.ArrayList;
 
 /**
  *  Autonomous mode system:
@@ -46,17 +46,11 @@ public class Auton extends LinearOpMode
     private AprilTagDetection tagOfInterest;
     private OpenCvCamera camera;
 
-    // Variables for color detection
-    private int yellowDetections = 0;
-    private boolean isYellowBuffer = false;
-    private boolean poleEnded = false;
-    private float[] hsvValues = new float[3];
+    private double globalAngle;
+    private Orientation lastAngles = new Orientation();
 
     // Side length of square tag in meters
     private static final double TAG_SIZE = 0.166;
-
-    // Brightness gain for color sensor
-    private static final float GAIN = 20;
 
     // Lens intrinsics for Logitech C920 webcam
     // (FX, FY) is focal length in pixels
@@ -71,6 +65,11 @@ public class Auton extends LinearOpMode
     private static final int MIDDLE = 2;
     private static final int RIGHT = 3;
 
+    // Junction constants 0, 1, and 2
+    private static final int GROUND = 0;
+    private static final int LOW = 1;
+    private static final int HIGH = 2;
+
     private final ElapsedTime RUNTIME = new ElapsedTime();
     private static final double COUNTS_PER_MOTOR_REV = 1120;
     private static final double DRIVE_GEAR_REDUCTION = 1.0;
@@ -78,7 +77,7 @@ public class Auton extends LinearOpMode
     private static final double COUNTS_PER_INCH = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
                                                   (WHEEL_DIAMETER_INCHES * 3.1415);
     private static final double DRIVE_SPEED = 0.5;
-    private static final double DETECTION_SPEED = 0.1;
+    private static final double LIFT_SPEED = 0.2;
 
     @Override
     public void runOpMode()
@@ -106,53 +105,59 @@ public class Auton extends LinearOpMode
             }
         });
 
-        // Initialize color sensor gain
-        NormalizedColorSensor colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
-        colorSensor.setGain(GAIN);
-
         // Wait for game to begin
         waitForStart();
 
         // Detect AprilTag
+        // TODO: Default after 5 seconds
+
+        /*
         boolean tagFound = false;
         while (isStarted() && !tagFound && !isStopRequested())
         {
             ArrayList<AprilTagDetection> currentDetections = pipeline.getLatestDetections();
 
             if (currentDetections.size() != 0)
-            {
                 for (AprilTagDetection tag : currentDetections)
-                {
                     if (tag.id == LEFT || tag.id == MIDDLE || tag.id == RIGHT)
                     {
                         tagOfInterest = tag;
                         tagFound = true;
                         break;
                     }
-                }
-            }
 
             sleep(20);
         }
 
         // Move for auton
+        // TODO: Make routine for right
         if (tagOfInterest == null || tagOfInterest.id == LEFT)
         {
-            // Left or default
-            driveSideways(-14);
-            driveForward(16);
+            driveSideways(-14.0);
+            driveForward(16.0);
         }
         else if (tagOfInterest.id == MIDDLE)
-        {
-            // Middle
             driveForward(22.5);
-        }
-        else
+        else // tagOfInterest.id == RIGHT
         {
-            // Right
-            driveSideways(14);
-            driveForward(16);
+            driveSideways(14.0);
+            driveForward(16.0);
         }
+         */
+
+        // Preload cycle
+        liftMove(GROUND);
+        closeClaw();
+
+        // Move to cone
+        driveSideways(-14.0);
+        driveForward(29.0);
+        gyroTurn(84.0); // Attempting a 90-degree turn
+
+        // Lift and drop cone
+        liftMove(HIGH);
+        driveForward(2.0);
+        openClaw();
     }
 
     /**
@@ -163,7 +168,7 @@ public class Auton extends LinearOpMode
      */
     public void driveForward(double distance)
     {
-        encoderDrive(DRIVE_SPEED, distance, 5, false, false);
+        encoderDrive(distance, false);
     }
 
     /**
@@ -174,45 +179,46 @@ public class Auton extends LinearOpMode
      */
     public void driveSideways(double distance)
     {
-        encoderDrive(DRIVE_SPEED, distance, 5, true, false);
+        encoderDrive(distance, true);
     }
 
     /**
-     *  Calls encoderDrive() to move sideways until the center of a pole is reached.
-     *  Moves right.
+     *  Calls clawMove() to open the claw.
      */
-    public void detectPole()
+    public void openClaw()
     {
-        encoderDrive(DETECTION_SPEED, 100, 10, true, true); // second parameter overshoots for safety
+        clawMove(1.0);
+    }
+
+    /**
+     *  Calls clawMove() to close the claw.
+     */
+    public void closeClaw()
+    {
+        clawMove(0.0);
     }
 
     /**
      *  Uses encoders to drive a specified distance in a specified direction at a specified speed.
-     *
-     *  @param voltage The power (-1.0 to 1.0) to send to each motor
-     *  @param distance The distance, in inches, a robot should travel sideways;
+     *   @param distance The distance, in inches, a robot should travel sideways;
      *                  positive is right or forward (depending on sidewaysSwitch)
-     *  @param timeout The time, in seconds, that a robot should have completed the
-     *                 routine by; if it hasn't, abort the routine
      *  @param sidewaysSwitch If true, move left/right; if false, more forward/backward
-     *  @param toScanPole If true, move slowly and scan for a pole
      */
-    public void encoderDrive(double voltage, double distance, double timeout, boolean sidewaysSwitch, boolean toScanPole)
+    private void encoderDrive(double distance, boolean sidewaysSwitch)
     {
         // Calculate distance
         int counts = (int)(-distance * COUNTS_PER_INCH);
 
         // Determine directional variables
         int directionalCounts = counts;
-        double directionalVoltage = Math.abs(voltage);
+        double directionalVoltage = Math.abs(DRIVE_SPEED);
         if (sidewaysSwitch)
         {
             directionalCounts = -counts;
-            directionalVoltage = -voltage;
+            directionalVoltage = -DRIVE_SPEED;
         }
 
         // Initialize the DC motors for each wheel
-        // Declare op-mode members
         DcMotor leftFront = hardwareMap.get(DcMotor.class, "leftFront");
         DcMotor rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         DcMotor leftRear = hardwareMap.get(DcMotor.class, "leftRear");
@@ -247,57 +253,16 @@ public class Auton extends LinearOpMode
         rightRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         // Reset the timeout time and start motion
-        RUNTIME.reset();
-        leftFront.setPower(-voltage);
+        leftFront.setPower(-DRIVE_SPEED);
         rightFront.setPower(directionalVoltage);
         leftRear.setPower(directionalVoltage);
-        rightRear.setPower(-voltage);
+        rightRear.setPower(-DRIVE_SPEED);
 
         // Keep running while the routine are still active, the timeout has not
         // elapsed, and both motors are still running
-        long startTime = System.nanoTime();
         while (opModeIsActive() &&
-              (RUNTIME.seconds() < timeout) &&
-              (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy()) &&
-              (!poleEnded && toScanPole)) {
-            getYellows();
-        }
-        long duration = System.nanoTime() - startTime;
-
-        // Second run back when scanning for pole
-        if (toScanPole)
-        {
-            int backtrackLeftFrontTarget = leftFront.getCurrentPosition() - counts;
-            int backtrackRightFrontTarget = rightFront.getCurrentPosition() - directionalCounts;
-            int backtrackLeftRearTarget = leftRear.getCurrentPosition() - directionalCounts;
-            int backtrackRightRearTarget = rightRear.getCurrentPosition() - counts;
-
-            // Pass target positions to motor controllers
-            leftFront.setTargetPosition(backtrackLeftFrontTarget);
-            rightFront.setTargetPosition(backtrackRightFrontTarget);
-            leftRear.setTargetPosition(backtrackLeftRearTarget);
-            rightRear.setTargetPosition(backtrackRightRearTarget);
-
-            // Begin running routine
-            leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            leftRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            rightRear.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-
-            // Reset the timeout time and start motion
-            RUNTIME.reset();
-            leftFront.setPower(-voltage);
-            rightFront.setPower(directionalVoltage);
-            leftRear.setPower(directionalVoltage);
-            rightRear.setPower(-voltage);
-
-            while (opModeIsActive() &&
-                  (RUNTIME.seconds() < timeout) &&
-                  (RUNTIME.seconds() < (duration / 2.0)) &&
-                  (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy())) {
-                // Stall for backtracking
-            }
-        }
+              (leftFront.isBusy() && rightFront.isBusy() && leftRear.isBusy() && rightRear.isBusy()))
+        {}
 
         // Stop all motion
         leftFront.setPower(0.0);
@@ -313,37 +278,188 @@ public class Auton extends LinearOpMode
     }
 
     /**
-     *  Gets whether yellow is visible to the color sensor and adds to the detection count.
+     *  Uses gyroscope to turn a specified angle at a specified speed.
+     *
+     * @param angle The angle, in degrees, a robot should turn;
+     *               positive is clockwise
      */
-    public void getYellows()
+    private void gyroTurn(double angle)
     {
-        NormalizedColorSensor colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+        // Initialize the DC motors for each wheel
+        DcMotor leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        DcMotor rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        DcMotor leftRear = hardwareMap.get(DcMotor.class, "leftRear");
+        DcMotor rightRear = hardwareMap.get(DcMotor.class, "rightRear");
 
-        NormalizedRGBA colors = colorSensor.getNormalizedColors();
-        Color.colorToHSV(colors.toColor(), hsvValues);
+        // Reverse right side
+        rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        boolean isYellow = 28 < hsvValues[0] && hsvValues[0] < 36;
+        // Resist external force to motor
+        leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        if ((isYellow && isYellowBuffer) || (isYellowBuffer && yellowDetections > 0))
+        // Initialize IMU for movement tracking
+        BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
+
+        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+        parameters.mode = BNO055IMU.SensorMode.IMU;
+        parameters.angleUnit = BNO055IMU.AngleUnit.DEGREES;
+        parameters.accelUnit = BNO055IMU.AccelUnit.METERS_PERSEC_PERSEC;
+        parameters.loggingEnabled = false;
+
+        imu.initialize(parameters);
+
+        // Restart IMU movement tracking
+        resetAngle();
+
+        // Calculate voltage for turn
+        double voltL, voltR;
+        if (angle > 0) // Right turn
         {
-            yellowDetections++;
-            poleEnded = false;
+            voltL = -DRIVE_SPEED;
+            voltR = DRIVE_SPEED;
         }
-        else if (yellowDetections > 0)
-            poleEnded = true;
+        else if (angle < 0) // Left turn
+        {
+            voltL = DRIVE_SPEED;
+            voltR = -DRIVE_SPEED;
+        }
+        else return;
 
-        isYellowBuffer = isYellow;
+        // Set power to begin rotating
+        leftFront.setPower(voltL);
+        rightFront.setPower(voltR);
+        leftRear.setPower(voltL);
+        rightRear.setPower(voltR);
 
-        telemetry.addData("detections", "%d", yellowDetections);
-        telemetry.addData("yellow?", "%s", isYellow ? "true" : "false");
-        telemetry.addLine()
-                 .addData("red", "%.3f", colors.red)
-                 .addData("green", "%.3f", colors.green)
-                 .addData("blue", "%.3f", colors.blue);
-        telemetry.addLine()
-                 .addData("hue", "%.3f", hsvValues[0])
-                 .addData("saturation", "%.3f", hsvValues[1])
-                 .addData("value", "%.3f", hsvValues[2]);
-        telemetry.update();
+        // Keep running until angle
+        if (angle > 0) // Right turn
+        {
+            // On a right turn, the robot must get off zero first
+            while (opModeIsActive() && getAngle() == 0) {}
+
+            while (opModeIsActive() && getAngle() < angle) {}
+        }
+        else // Left turn
+            while (opModeIsActive() && getAngle() > angle) {}
+
+        // Stop all motion
+        leftFront.setPower(0.0);
+        rightFront.setPower(0.0);
+        leftRear.setPower(0.0);
+        rightRear.setPower(0.0);
+
+        // Stop running to position
+        leftFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        rightFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        leftRear.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        rightRear.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
+        // Wait for rotation to stop
+        sleep(1000);
+
+        // Reset angle tracking on new heading
+        resetAngle();
+    }
+
+    /**
+     *  Moves the claw to a specified target position and stall for a short period of time.
+     *
+     *  @param targetPos A value between 0.0 and 1.0, inclusive,
+     *                   that the claw should o to. 1.0 is open,
+     *                   0.0 is closed.
+     */
+    private void clawMove(double targetPos)
+    {
+        Servo clawServo = hardwareMap.get(Servo.class, "claw");
+
+        RUNTIME.reset();
+        while (opModeIsActive() && RUNTIME.milliseconds() < 500)
+            clawServo.setPosition(targetPos);
+    }
+
+    /**
+     *  Moves the lift to the height of a specified pole.
+     *
+     *  @param junction Either 0 (ground), 1 (low), or 2 (high).
+     *                  The junction to target the height for.
+     */
+    private void liftMove(int junction)
+    {
+        int counts = new int[]{9, 200, 295}[junction];
+
+        // Initialize the DC motors for each wheel
+        DcMotor arm1 = hardwareMap.get(DcMotor.class, "lift");
+        DcMotor arm2 = hardwareMap.get(DcMotor.class, "arm2");
+
+        // Reverse right side
+        arm1.setDirection(DcMotor.Direction.REVERSE);
+        arm2.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        // Determine new target position
+        int liftTarget = arm1.getCurrentPosition() + counts;
+
+        // Pass target positions to motor controllers
+        arm1.setTargetPosition(liftTarget);
+        arm2.setTargetPosition(liftTarget);
+
+        // Begin running routine
+        arm1.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        arm2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+        // Reset the timeout time and start motion
+        arm1.setPower(LIFT_SPEED);
+        arm2.setPower(LIFT_SPEED);
+
+        // Keep running while the routine are still active, the timeout has not
+        // elapsed, and both motors are still running
+        while (opModeIsActive() &&
+              (arm1.isBusy() && arm2.isBusy()))
+        {}
+
+        // Stop all motion
+        arm1.setPower(0.0);
+        arm2.setPower(0.0);
+
+        // Stop running to position
+        arm1.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        arm2.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+    }
+
+    /**
+     *  Resets the registered angle of the IMU for rotation.
+     */
+    private void resetAngle()
+    {
+        BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
+        lastAngles = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
+
+        globalAngle = 0.0;
+    }
+
+    /**
+     *  Gets the current angle as determined by the IMU.
+     *
+     *  @return The current angle of the robot
+     */
+    private double getAngle()
+    {
+        BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
+        Orientation angles = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
+
+        double deltaAngle = angles.firstAngle - lastAngles.firstAngle;
+
+        if (deltaAngle < -180)
+            deltaAngle += 360;
+        else if (deltaAngle > 180)
+            deltaAngle -= 360;
+
+        globalAngle -= deltaAngle;
+        lastAngles = angles;
+
+        return globalAngle;
     }
 }
