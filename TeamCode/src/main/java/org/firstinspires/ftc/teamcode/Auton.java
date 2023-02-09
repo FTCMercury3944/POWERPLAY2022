@@ -146,17 +146,18 @@ public class Auton extends LinearOpMode
          */
 
         // Preload cycle
-        liftMove(GROUND);
+        moveLift(GROUND);
         closeClaw();
 
         // Move to cone
-        driveSideways(-14.0);
-        driveForward(29.0);
+        driveSideways(-14.5);
+        driveForward(31.5);
         gyroTurn(84.0); // Attempting a 90-degree turn
 
         // Lift and drop cone
-        liftMove(HIGH);
-        driveForward(2.0);
+        moveLift(HIGH);
+        driveForward(2.5);
+        secureLift(HIGH);
         openClaw();
     }
 
@@ -187,7 +188,7 @@ public class Auton extends LinearOpMode
      */
     public void openClaw()
     {
-        clawMove(1.0);
+        clawMove(0.0);
     }
 
     /**
@@ -195,7 +196,23 @@ public class Auton extends LinearOpMode
      */
     public void closeClaw()
     {
-        clawMove(0.0);
+        clawMove(1.0);
+    }
+
+    /**
+     *  Calls liftMove() to move the lift to a specified junction.
+     */
+    public void moveLift(int junction)
+    {
+        liftMove(junction, false);
+    }
+
+    /**
+     *  Calls liftMove() to slightly move the lift downwards (300 counts).
+     */
+    public void secureLift(int junction)
+    {
+        liftMove(junction, true);
     }
 
     /**
@@ -369,15 +386,15 @@ public class Auton extends LinearOpMode
      *  Moves the claw to a specified target position and stall for a short period of time.
      *
      *  @param targetPos A value between 0.0 and 1.0, inclusive,
-     *                   that the claw should o to. 1.0 is open,
-     *                   0.0 is closed.
+     *                   that the claw should go to. 0.0 is open,
+     *                   1.0 is closed.
      */
     private void clawMove(double targetPos)
     {
         Servo clawServo = hardwareMap.get(Servo.class, "claw");
 
         RUNTIME.reset();
-        while (opModeIsActive() && RUNTIME.milliseconds() < 500)
+        while (opModeIsActive() && RUNTIME.milliseconds() < 1000)
             clawServo.setPosition(targetPos);
     }
 
@@ -386,39 +403,38 @@ public class Auton extends LinearOpMode
      *
      *  @param junction Either 0 (ground), 1 (low), or 2 (high).
      *                  The junction to target the height for.
+     *  @param security If true, move slightly below the junction
+     *                  for security.
      */
-    private void liftMove(int junction)
+    private void liftMove(int junction, boolean security)
     {
-        int counts = new int[]{9, 200, 295}[junction];
+        int counts = new int[]{100, 1500, 2500}[junction];
+        if (security) counts -= 300;
 
         // Initialize the DC motors for each wheel
         DcMotor arm1 = hardwareMap.get(DcMotor.class, "lift");
         DcMotor arm2 = hardwareMap.get(DcMotor.class, "arm2");
 
-        // Reverse right side
-        arm1.setDirection(DcMotor.Direction.REVERSE);
-        arm2.setDirection(DcMotorSimple.Direction.REVERSE);
+        // Determine new target position for encoder
+        int arm1Target = arm1.getCurrentPosition() + counts;
 
-        // Determine new target position
-        int liftTarget = arm1.getCurrentPosition() + counts;
-
-        // Pass target positions to motor controllers
-        arm1.setTargetPosition(liftTarget);
-        arm2.setTargetPosition(liftTarget);
+        // Pass target position to encoder
+        arm1.setTargetPosition(arm1Target);
 
         // Begin running routine
         arm1.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-        arm2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         // Reset the timeout time and start motion
         arm1.setPower(LIFT_SPEED);
-        arm2.setPower(LIFT_SPEED);
 
         // Keep running while the routine are still active, the timeout has not
-        // elapsed, and both motors are still running
-        while (opModeIsActive() &&
-              (arm1.isBusy() && arm2.isBusy()))
-        {}
+        // elapsed, and the encoder is still running; set non-encoder power at
+        // the same time
+        while (opModeIsActive() && arm1.isBusy())
+            arm2.setPower(LIFT_SPEED);
+
+        telemetry.addData("routine", "done");
+        telemetry.update();
 
         // Stop all motion
         arm1.setPower(0.0);
@@ -426,7 +442,6 @@ public class Auton extends LinearOpMode
 
         // Stop running to position
         arm1.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        arm2.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
     /**
